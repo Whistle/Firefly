@@ -7,6 +7,14 @@
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
 uint8_t sleep_interval;
+uint32_t lfsr=0xdeadbeef;
+
+uint32_t random() {
+	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
+	// Galois LFSR: taps: 32 31 29 1; characteristic polynomial: x^32 + x^31 + x^29 + x + 1
+	lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xD0000001u);
+	return lfsr;
+}
 
 uint8_t values[20] = {
 	0, 90, 168, 223, 252, 255, 236, 202, 162, 122,
@@ -106,8 +114,11 @@ int main() {
 				writePWM(values[i]);
 				sleep(1, SLEEP_MODE_IDLE);
 			}
-		} else {
-			init_wdt(WDP_8S);
+		}
+
+		init_wdt(WDP_8S);
+		sleep(1, SLEEP_MODE_PWR_DOWN);
+		if(random() & 1) {
 			sleep(1, SLEEP_MODE_PWR_DOWN);
 		}
 	}
@@ -117,7 +128,7 @@ ISR(WDT_vect) {
 	sleep_interval++;
 	wdt_reset();
 	// Re-enable WDT interrupt. Normally we wouldn't do that here,
-	// But we're using this routine purely as a timeout; 
+	// But we're using this routine purely as a timeout;
 	// WDT is never used for reset
 	WDTCR |= (1<<WDTIE);
 }
