@@ -3,7 +3,6 @@
 #include <avr/wdt.h>
 #include <avr/sleep.h>
 
-#define WDP_16MS (0)
 #define WDP_32MS (1<<WDP0)
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
@@ -12,12 +11,9 @@
 volatile uint8_t sleep_interval;
 volatile uint32_t lfsr=0xc0a0f0e0;
 
-uint8_t sequence0[SEQ_SIZE] = {
+// Duty cycle sequence of the firefly
+uint8_t sequence[SEQ_SIZE] = {
 	0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0
-};
-
-uint8_t sequence1[SEQ_SIZE] = {
-	90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0, 0
 };
 
 uint32_t random() {
@@ -121,7 +117,7 @@ int main() {
 		if(readLightLevel() > 700) {
 			for(i=0; i < SEQ_SIZE; i++) {
 				setupWDT(WDP_32MS);
-				writePWM(sequence0[i]);
+				writePWM(sequence[i]);
 				sleep(1, SLEEP_MODE_IDLE);
 			}
 		}
