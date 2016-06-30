@@ -13,7 +13,7 @@ volatile uint32_t lfsr=0xc0a0f0e0;
 
 // Duty cycle sequence of the firefly
 uint8_t sequence[SEQ_SIZE] = {
-	0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0
+	0, 0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1
 };
 
 uint32_t random() {
@@ -30,16 +30,12 @@ void setupPWM() {
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
 	// Clear OC0B (PB1) output on compare match, upwards counting.
 	TCCR0A |= (1 << COM0B1);
-	// Clear OC0A (PB0) output on compare match, upwards counting.
-	TCCR0A |= (1 << COM0A1);
 	// Set duty cycle to 0
 	OCR0B = 0;
-	OCR0A = 0;
 }
 
 void writePWM (uint8_t val) {
 	OCR0B = val;
-	OCR0A = val;
 }
 
 // Enable watchdog interrupt and set prescaling
@@ -49,7 +45,7 @@ void setupWDT(uint8_t wdp) {
 	// Start timed sequence
 	// Set Watchdog Change Enable bit
 	WDTCR |= (1<<WDCE);
-	// Set new prescaler (1 sec), unset reset enable
+	// Set new prescaler, unset reset enable
 	// enable WDT interrupt
 	WDTCR = (1<<WDTIE) | wdp;
 }
@@ -105,18 +101,19 @@ uint16_t readLightLevel() {
 
 int main() {
 	int i;
+	uint16_t lightLevel;
 
 	// Setup OC0B (PB1) as output
 	DDRB = (1<<PB1);
-	// Setup OC0A (PB0) as output
-	DDRB |= (1<<PB0);
 
 	setupPWM();
 
 	while(1) {
-		if(readLightLevel() > 700) {
+		lightLevel = readLightLevel();
+
+		if(lightLevel) {
+			setupWDT(WDP_32MS);
 			for(i=0; i < SEQ_SIZE; i++) {
-				setupWDT(WDP_32MS);
 				writePWM(sequence[i]);
 				sleep(1, SLEEP_MODE_IDLE);
 			}
@@ -124,9 +121,6 @@ int main() {
 
 		setupWDT(WDP_8S);
 		sleep(1, SLEEP_MODE_PWR_DOWN);
-		if(random() & 1) {
-			sleep(1, SLEEP_MODE_PWR_DOWN);
-		}
 	}
 }
 
