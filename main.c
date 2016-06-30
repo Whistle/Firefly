@@ -6,6 +6,8 @@
 #define WDP_32MS (1<<WDP0)
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
+#define SEQ_SIZE 20
+
 uint8_t sleep_interval;
 uint32_t lfsr=0xdeadbeef;
 
@@ -16,9 +18,8 @@ uint32_t random() {
 	return lfsr;
 }
 
-uint8_t values[20] = {
-	0, 90, 168, 223, 252, 255, 236, 202, 162, 122,
-	86, 58, 37, 22, 12, 7, 3, 2, 1, 0
+uint8_t sequence[SEQ_SIZE] = {
+	0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0
 };
 
 void setupPWM() {
@@ -37,7 +38,7 @@ void writePWM (uint8_t val) {
 }
 
 // Enable watchdog interrupt, set prescaling to 1 sec
-void init_wdt(uint8_t wdp) {
+void setupWDT(uint8_t wdp) {
 	// Disable interrupts
 	cli();
 	// Start timed sequence
@@ -46,7 +47,6 @@ void init_wdt(uint8_t wdp) {
 	// Set new prescaler (1 sec), unset reset enable
 	// enable WDT interrupt
 	WDTCR = (1<<WDTIE) | wdp;
-	sei();
 }
 
 void sleep(uint8_t s, uint8_t mode) {
@@ -102,21 +102,20 @@ uint16_t readLightLevel() {
 int main() {
 	int i;
 	setupPWM();
-	init_wdt((1<<WDP0));
 
 	// Setup OC0B (PB1) as output
 	DDRB = (1<<PB1);
 
 	while(1) {
 		if(readLightLevel() > 700) {
-			for(i=0; i < 20; i++) {
-				init_wdt(WDP_32MS);
-				writePWM(values[i]);
+			for(i=0; i < SEQ_SIZE; i++) {
+				setupWDT(WDP_32MS);
+				writePWM(sequence[i]);
 				sleep(1, SLEEP_MODE_IDLE);
 			}
 		}
 
-		init_wdt(WDP_8S);
+		setupWDT(WDP_8S);
 		sleep(1, SLEEP_MODE_PWR_DOWN);
 		if(random() & 1) {
 			sleep(1, SLEEP_MODE_PWR_DOWN);
