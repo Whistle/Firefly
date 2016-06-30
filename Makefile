@@ -12,12 +12,9 @@ main: $(OBJS)
 	${CC} -c -Os -mmcu=${MCU} -o $@ $^
 burn: main.hex
 	avrdude -p${MCU_AVRDUDE} -cavrispmkII -P /dev/ttyUSB0 -U flash:w:$<
-# internal 8MHz with 2.7V Brown-out
+# internal 9.6MHz
 fuse:
-	avrdude -p${MCU_AVRDUDE} -cavrispmkII -P /dev/ttyUSB0 -U lfuse:w:0xe2:m -U hfuse:w:0xdd:m -U efuse:w:0xff:m
-# internal 8MHz with 2.7V Brown-out + clockout
-dbgfuse:
-	avrdude -p${MCU_AVRDUDE} -cavrispmkII -P /dev/ttyUSB0 -U lfuse:w:0xa2:m -U hfuse:w:0xdd:m -U efuse:w:0xff:m
+	avrdude -p${MCU_AVRDUDE} -cavrispmkII -P /dev/ttyUSB0 -U lfuse:w:0x7a:m -U hfuse:w:0xff:m
 clean:
 	-rm main
 	-rm $(OBJS)

@@ -3,13 +3,22 @@
 #include <avr/wdt.h>
 #include <avr/sleep.h>
 
+#define WDP_16MS (0)
 #define WDP_32MS (1<<WDP0)
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
 #define SEQ_SIZE 20
 
-uint8_t sleep_interval;
-uint32_t lfsr=0xdeadbeef;
+volatile uint8_t sleep_interval;
+volatile uint32_t lfsr=0xc0a0f0e0;
+
+uint8_t sequence0[SEQ_SIZE] = {
+	0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0
+};
+
+uint8_t sequence1[SEQ_SIZE] = {
+	90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0, 0
+};
 
 uint32_t random() {
 	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
@@ -18,10 +27,6 @@ uint32_t random() {
 	return lfsr;
 }
 
-uint8_t sequence[SEQ_SIZE] = {
-	0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0
-};
-
 void setupPWM() {
 	// Set Timer 0 prescaler
 	TCCR0B |= (1 << CS01) | (1 << CS00);
@@ -29,15 +34,19 @@ void setupPWM() {
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
 	// Clear OC0B (PB1) output on compare match, upwards counting.
 	TCCR0A |= (1 << COM0B1);
+	// Clear OC0A (PB0) output on compare match, upwards counting.
+	TCCR0A |= (1 << COM0A1);
 	// Set duty cycle to 0
 	OCR0B = 0;
+	OCR0A = 0;
 }
 
 void writePWM (uint8_t val) {
 	OCR0B = val;
+	OCR0A = val;
 }
 
-// Enable watchdog interrupt, set prescaling to 1 sec
+// Enable watchdog interrupt and set prescaling
 void setupWDT(uint8_t wdp) {
 	// Disable interrupts
 	cli();
@@ -50,7 +59,6 @@ void setupWDT(uint8_t wdp) {
 }
 
 void sleep(uint8_t s, uint8_t mode) {
-	uint8_t i;
 	sei();
 	sleep_interval = 0;
 	while (sleep_interval < s) {
@@ -101,16 +109,19 @@ uint16_t readLightLevel() {
 
 int main() {
 	int i;
-	setupPWM();
 
 	// Setup OC0B (PB1) as output
 	DDRB = (1<<PB1);
+	// Setup OC0A (PB0) as output
+	DDRB |= (1<<PB0);
+
+	setupPWM();
 
 	while(1) {
 		if(readLightLevel() > 700) {
 			for(i=0; i < SEQ_SIZE; i++) {
 				setupWDT(WDP_32MS);
-				writePWM(sequence[i]);
+				writePWM(sequence0[i]);
 				sleep(1, SLEEP_MODE_IDLE);
 			}
 		}
