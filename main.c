@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
 #include <avr/sleep.h>
+#include <avr/pgmspace.h>
 
 #define WDP_32MS (1<<WDP0)
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
@@ -9,25 +10,18 @@
 #define SEQ_SIZE 20
 
 volatile uint8_t sleep_interval;
-volatile uint32_t lfsr=0xc0a0f0e0;
-
-volatile uint16_t lfsr16=0xcafe;
 
 // Duty cycle sequence of the firefly
-uint8_t sequence[SEQ_SIZE] = {
+uint8_t const sequence[SEQ_SIZE] PROGMEM = {
 	0, 0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1
 };
 
-uint32_t random32() {
-	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
-	// Galois LFSR: taps: 32 31 29 1; characteristic polynomial: x^32 + x^31 + x^29 + x + 1
-	lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xD0000001u);
-	return lfsr;
-}
+uint16_t random() {
+	static uint16_t lfsr=0xcafe;
 
-uint16_t random16() {
-	lfsr16 = (lfsr16 >> 1) ^ (-(lfsr16 & 1u) & 0xB400u);
-	return lfsr16;
+	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
+	lfsr = (lfsr >> 1) ^ (-(lfsr & 1u) & 0xB400u);
+	return lfsr;
 }
 
 void setupPWM() {
@@ -122,7 +116,7 @@ int main() {
 			// firefly sequence
 			setupWDT(WDP_32MS);
 			for(i=0; i < SEQ_SIZE; i++) {
-				writePWM(sequence[i]);
+				writePWM(pgm_read_byte(&sequence[i]));
 				sleep(1, SLEEP_MODE_IDLE);
 			}
 		}
