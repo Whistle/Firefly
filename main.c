@@ -68,6 +68,7 @@ void sleep(uint8_t s, uint8_t mode) {
 }
 
 void adcEnable() {
+	PRR &= ~(1<<PRADC);
 	ADMUX =
 		(0 << REFS0) |             // VCC as voltage reference
 		(0 << ADLAR) |             // 10 Bit resolution
@@ -83,6 +84,7 @@ void adcEnable() {
 
 void adcDisable() {
 	ADCSRA &= ~(1<<ADEN);          // remove ADC enable
+	PRR |= (1<<PRADC);
 }
 
 uint16_t readADC() {
@@ -106,6 +108,8 @@ uint16_t readLightLevel() {
 int main() {
 	int i;
 	uint16_t lightLevel;
+	// We will never use the AC
+	ACSR |= (1<<ACD);
 
 	// Setup OC0B (PB1) and OC0A (PB0) as output
 	DDRB = (1<<PB1) | (1<<PB0);
