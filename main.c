@@ -5,6 +5,8 @@
 #include <avr/pgmspace.h>
 
 #define WDP_32MS (1<<WDP0)
+#define WDP_1S  ((1<<WDP2) | (1<<WDP1))
+#define WDP_2S  ((1<<WDP2) | (1<<WDP1) | (1<<WDP0))
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
 #define SEQ_SIZE 20
@@ -26,22 +28,25 @@ uint16_t random() {
 
 void setupPWM() {
 	// Set Timer 0 prescaler
-	TCCR0B |= (1 << CS01) | (1 << CS00);
+	TCCR0B |= (1 << CS00);
 	// Set to 'Fast PWM' mode
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
 	// Clear OC0B (PB1) output on compare match, upwards counting.
 	TCCR0A |= (1 << COM0B1);
+	// Clear OC0A (PB0) output on compare match, upwards counting.
+	TCCR0A |= (1 << COM0A1);
 	// Set duty cycle to 0
 	OCR0B = 0;
+	OCR0A = 0;
 }
 
 void writePWM (uint8_t val) {
 	OCR0B = val;
+	OCR0A = val;
 }
 
 // Enable watchdog interrupt and set prescaling
 void setupWDT(uint8_t wdp) {
-	// Disable interrupts
 	cli();
 	// Start timed sequence
 	// Set Watchdog Change Enable bit
@@ -64,20 +69,20 @@ void sleep(uint8_t s, uint8_t mode) {
 
 void adcEnable() {
 	ADMUX =
-		(0 << REFS0) | // VCC as voltage reference
-		(0 << ADLAR) | // 10 Bit resolution
-		(1 << MUX1)  | // ADC2(PB4)
-		(0 << MUX0);   // ADC2(PB4)
+		(0 << REFS0) |             // VCC as voltage reference
+		(0 << ADLAR) |             // 10 Bit resolution
+		(1 << MUX1)  |             // ADC2(PB4)
+		(0 << MUX0);               // ADC2(PB4)
 
 	ADCSRA =
-		(1 << ADEN)  | // ADC enable
-		(1 << ADPS2) | // set prescaler to 64, bit 2
-		(1 << ADPS1) | // set prescaler to 64, bit 1
-		(0 << ADPS0);  // set prescaler to 64, bit 0
+		(1 << ADEN)  |             // ADC enable
+		(1 << ADPS2) |             // set prescaler to 64, bit 2
+		(1 << ADPS1) |             // set prescaler to 64, bit 1
+		(0 << ADPS0);              // set prescaler to 64, bit 0
 }
 
 void adcDisable() {
-	ADCSRA &= ~(1<<ADEN); // remove ADC enable
+	ADCSRA &= ~(1<<ADEN);          // remove ADC enable
 }
 
 uint16_t readADC() {
@@ -91,10 +96,8 @@ uint16_t readLightLevel() {
 	uint16_t lightLevel;
 
 	adcEnable();
-	// dummy read
-	readADC();
-	// reading ADC
-	lightLevel = readADC();
+	readADC();                     // dummy read
+	lightLevel = readADC();        // reading ADC
 
 	adcDisable();
 	return lightLevel;
@@ -104,8 +107,8 @@ int main() {
 	int i;
 	uint16_t lightLevel;
 
-	// Setup OC0B (PB1) as output
-	DDRB = (1<<PB1);
+	// Setup OC0B (PB1) and OC0A (PB0) as output
+	DDRB = (1<<PB1) | (1<<PB0);
 
 	setupPWM();
 
