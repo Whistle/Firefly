@@ -110,6 +110,8 @@ int main() {
 	uint16_t lightLevel;
 	// We will never use the AC
 	ACSR |= (1<<ACD);
+	// We do not have any digital input
+	DIDR0 = (1<<ADC0D) | (1<<ADC2D) | (1<<ADC3D) | (1<<ADC1D) | (1<<AIN1D) | (1<<AIN0D);
 
 	// Setup OC0B (PB1) and OC0A (PB0) as output
 	DDRB = (1<<PB1) | (1<<PB0);
