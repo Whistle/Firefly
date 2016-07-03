@@ -1,3 +1,13 @@
+#define F_CPU 1.2e6
+
+#define LIGTH_THRESHOLD   0xBF
+
+#define UPPER_LIMIT 10
+#define CONFIDENCE_LIMIT 7
+#define LOWER_LIMIT 0
+
+#define BUCKET_SIZE 900
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
@@ -12,6 +22,9 @@
 #define SEQ_SIZE 20
 
 volatile uint8_t sleep_interval;
+
+int8_t dark;
+int16_t firefly_bucket;
 
 // Duty cycle sequence of the firefly
 uint8_t const sequence[SEQ_SIZE] PROGMEM = {
@@ -31,8 +44,6 @@ void setupPWM() {
 	TCCR0B |= (1 << CS00);
 	// Set to 'Fast PWM' mode
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
-	// Clear OC0B (PB1) output on compare match, upwards counting.
-	TCCR0A |= (1 << COM0B1);
 	// Clear OC0A (PB0) output on compare match, upwards counting.
 	TCCR0A |= (1 << COM0A1);
 	// Set duty cycle to 0
@@ -77,9 +88,9 @@ void adcEnable() {
 
 	ADCSRA =
 		(1 << ADEN)  |             // ADC enable
-		(1 << ADPS2) |             // set prescaler to 64, bit 2
+		(0 << ADPS2) |             // set prescaler to 64, bit 2
 		(1 << ADPS1) |             // set prescaler to 64, bit 1
-		(0 << ADPS0);              // set prescaler to 64, bit 0
+		(1 << ADPS0);              // set prescaler to 64, bit 0
 }
 
 void adcDisable() {
@@ -107,7 +118,7 @@ uint16_t readLightLevel() {
 
 int main() {
 	int i;
-	uint16_t lightLevel;
+	int lightLevel;
 	// We will never use the AC
 	ACSR |= (1<<ACD);
 	// We do not have any digital input
@@ -117,16 +128,37 @@ int main() {
 	DDRB = (1<<PB1) | (1<<PB0);
 
 	setupPWM();
+	dark = LOWER_LIMIT;
+	firefly_bucket = BUCKET_SIZE;
 
 	while(1) {
 		lightLevel = readLightLevel();
 
-		if(lightLevel) {
-			// firefly sequence
-			setupWDT(WDP_32MS);
-			for(i=0; i < SEQ_SIZE; i++) {
-				writePWM(pgm_read_byte(&sequence[i]));
-				sleep(1, SLEEP_MODE_IDLE);
+		if(lightLevel > LIGTH_THRESHOLD) {
+			if(dark < UPPER_LIMIT) dark++;
+		} else {
+			if(dark > LOWER_LIMIT) dark--;
+		}
+
+		if(dark >= CONFIDENCE_LIMIT) {
+			if(firefly_bucket > 0) {
+				firefly_bucket--;
+
+				DDRB |= (1<<PB4);
+				TCCR0A |= (1 << COM0B1);
+
+				// firefly sequence
+				setupWDT(WDP_32MS);
+				for(i=0; i < SEQ_SIZE; i++) {
+					writePWM(pgm_read_byte(&sequence[i]));
+					sleep(1, SLEEP_MODE_IDLE);
+				}
+				TCCR0A &= ~(1 << COM0B1);
+				DDRB &= ~(1<<PB4);
+			}
+		} else {
+			if(firefly_bucket < BUCKET_SIZE) {
+				firefly_bucket++;
 			}
 		}
 
