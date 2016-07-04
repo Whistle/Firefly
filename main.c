@@ -1,5 +1,3 @@
-#define F_CPU 1.2e6
-
 #define LIGTH_THRESHOLD   0xBF
 
 #define UPPER_LIMIT 10
@@ -99,9 +97,9 @@ static void adcEnable() {
 
 	ADCSRA =
 		(1 << ADEN)  |             // ADC enable
-		(0 << ADPS2) |             // set prescaler to 64, bit 2
-		(1 << ADPS1) |             // set prescaler to 64, bit 1
-		(1 << ADPS0);              // set prescaler to 64, bit 0
+		(0 << ADPS2) |             // set prescaler to 8, bit 2
+		(0 << ADPS1) |             // set prescaler to 8, bit 1
+		(1 << ADPS0);              // set prescaler to 8, bit 0
 }
 
 static void adcDisable() {
@@ -142,6 +140,7 @@ int main() {
 
 	// Setup OC0B (PB1) and OC0A (PB0) as output
 	DDRB = (1<<PB1) | (1<<PB0);
+	PORTB |= (1<<PB2) | (1<<PB3)| (1<<PB5);
 
 	// Setup PWM channels and Watchdog
 	setupPWM();
@@ -166,6 +165,8 @@ int main() {
 
 				// Pull PB4 to GND for PWM
 				DDRB |= (1<<PB4);
+
+				PRR &= ~(1<<PRTIM0);
 				// Enable PWM channel
 				TCCR0A |= (1 << COM0B1);
 				TCCR0A |= (1 << COM0A1);
@@ -199,6 +200,7 @@ int main() {
 				// Disable PWM channels
 				TCCR0A &= ~(1 << COM0B1);
 				TCCR0A &= ~(1 << COM0A1);
+				PRR |= (1<<PRTIM0);
 				// Recover PB4 for ADC read
 				DDRB &= ~(1<<PB4);
 			}
