@@ -6,7 +6,16 @@
 #define CONFIDENCE_LIMIT 7
 #define LOWER_LIMIT 0
 
-#define BUCKET_SIZE 900
+#define TOKENS_MAX 900
+
+#define FIREFLY0_ENABLED (1<<0)
+#define FIREFLY1_ENABLED (1<<1)
+
+#define FIREFLY0_OFFSET (1<<2)
+#define FIREFLY1_OFFSET (1<<3)
+
+#define FIREFLY0_INTENSITY (1<<4)
+#define FIREFLY1_INTENSITY (1<<5)
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -19,16 +28,16 @@
 #define WDP_2S  ((1<<WDP2) | (1<<WDP1) | (1<<WDP0))
 #define WDP_8S  ((1<<WDP3) | (1<<WDP0))
 
-#define SEQ_SIZE 20
+#define SEQ_SIZE 22
 
 volatile uint8_t sleep_interval;
 
-int8_t dark;
-int16_t firefly_bucket;
+int8_t darkness;
+int16_t firefly_tokens;
 
 // Duty cycle sequence of the firefly
 uint8_t const sequence[SEQ_SIZE] PROGMEM = {
-	0, 0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1
+	0, 0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0, 0
 };
 
 uint16_t random() {
@@ -51,9 +60,12 @@ void setupPWM() {
 	OCR0A = 0;
 }
 
-void writePWM (uint8_t val) {
-	OCR0B = val;
+void firefly1(uint8_t val) {
 	OCR0A = val;
+}
+
+void firefly0(uint8_t val) {
+	OCR0B = val;
 }
 
 // Enable watchdog interrupt and set prescaling
@@ -117,8 +129,13 @@ uint16_t readLightLevel() {
 }
 
 int main() {
-	int i;
-	int lightLevel;
+	uint8_t i;
+	uint16_t lightLevel;
+	uint16_t pattern;
+
+	uint8_t offset0, intensity_shift0;
+	uint8_t offset1, intensity_shift1;
+
 	// We will never use the AC
 	ACSR |= (1<<ACD);
 	// We do not have any digital input
@@ -127,44 +144,68 @@ int main() {
 	// Setup OC0B (PB1) and OC0A (PB0) as output
 	DDRB = (1<<PB1) | (1<<PB0);
 
+	// Setup PWM channels and Watchdog
 	setupPWM();
-	dark = LOWER_LIMIT;
-	firefly_bucket = BUCKET_SIZE;
+	setupWDT(WDP_8S);
+
+	darkness = LOWER_LIMIT;
+	firefly_tokens = TOKENS_MAX;
 
 	while(1) {
 		lightLevel = readLightLevel();
 
 		if(lightLevel > LIGTH_THRESHOLD) {
-			if(dark < UPPER_LIMIT) dark++;
+			if(darkness < UPPER_LIMIT) darkness++;
 		} else {
-			if(dark > LOWER_LIMIT) dark--;
+			if(darkness > LOWER_LIMIT) darkness--;
 		}
 
-		if(dark >= CONFIDENCE_LIMIT) {
-			if(firefly_bucket > 0) {
-				firefly_bucket--;
+		if(darkness >= CONFIDENCE_LIMIT) {
+			pattern = random() ^ lightLevel;
+			if(firefly_tokens > 0) {
+				firefly_tokens--;
 
 				DDRB |= (1<<PB4);
 				TCCR0A |= (1 << COM0B1);
 
+				offset0 = 0;
+				offset1 = 0;
+				if(pattern & FIREFLY0_OFFSET)
+					offset0 = 2;
+				if(pattern & FIREFLY1_OFFSET)
+					offset1 = 2;
+
+				if(pattern & FIREFLY0_INTENSITY)
+					intensity_shift0 = 2;
+				if(pattern & FIREFLY1_INTENSITY)
+					intensity_shift1 = 2;
+
 				// firefly sequence
 				setupWDT(WDP_32MS);
-				for(i=0; i < SEQ_SIZE; i++) {
-					writePWM(pgm_read_byte(&sequence[i]));
+				for(i=0; i < (SEQ_SIZE - 2); i++) {
+					if(pattern & FIREFLY0_ENABLED)
+						firefly0(pgm_read_byte(&sequence[i+offset0])>>intensity_shift0);
+					if(pattern & FIREFLY1_ENABLED)
+						firefly1(pgm_read_byte(&sequence[i+offset1])>>intensity_shift1);
 					sleep(1, SLEEP_MODE_IDLE);
 				}
 				TCCR0A &= ~(1 << COM0B1);
 				DDRB &= ~(1<<PB4);
+
+				// Recover WDT after changing WDT to smaller value
+				setupWDT(WDP_8S);
 			}
 		} else {
-			if(firefly_bucket < BUCKET_SIZE) {
-				firefly_bucket++;
+			if(firefly_tokens < TOKENS_MAX) {
+				firefly_tokens++;
 			}
 		}
 
 		// pause between firefly action
-		setupWDT(WDP_8S);
-		sleep(1, SLEEP_MODE_PWR_DOWN);
+		if((pattern & FIREFLY0_ENABLED) && (pattern & FIREFLY1_ENABLED))       // Both fireflies in action
+			sleep(2, SLEEP_MODE_PWR_DOWN);
+		else if((pattern & FIREFLY0_ENABLED) || (pattern & FIREFLY1_ENABLED))  // One of two in action
+			sleep(1, SLEEP_MODE_PWR_DOWN);
 	}
 }
 
