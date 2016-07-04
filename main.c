@@ -40,7 +40,7 @@ uint8_t const sequence[SEQ_SIZE] PROGMEM = {
 	0, 0, 90, 168, 223, 252, 255, 236, 202, 162, 122, 86, 58, 37, 22, 12, 7, 3, 2, 1, 0, 0
 };
 
-uint16_t random() {
+static uint16_t random() {
 	static uint16_t lfsr=0xcafe;
 
 	// http://en.wikipedia.org/wiki/Linear_feedback_shift_register
@@ -48,7 +48,7 @@ uint16_t random() {
 	return lfsr;
 }
 
-void setupPWM() {
+static void setupPWM() {
 	// Set Timer 0 prescaler
 	TCCR0B |= (1 << CS00);
 	// Set to 'Fast PWM' mode
@@ -59,16 +59,16 @@ void setupPWM() {
 	OCR0A = 0;
 }
 
-void firefly1(uint8_t val) {
+static void firefly1(uint8_t val) {
 	OCR0A = val;
 }
 
-void firefly0(uint8_t val) {
+static void firefly0(uint8_t val) {
 	OCR0B = val;
 }
 
 // Enable watchdog interrupt and set prescaling
-void setupWDT(uint8_t wdp) {
+static void setupWDT(uint8_t wdp) {
 	cli();
 	// Start timed sequence
 	// Set Watchdog Change Enable bit
@@ -78,7 +78,7 @@ void setupWDT(uint8_t wdp) {
 	WDTCR = (1<<WDTIE) | wdp;
 }
 
-void sleep(uint8_t s, uint8_t mode) {
+static void sleep(uint8_t s, uint8_t mode) {
 	sei();
 	sleep_interval = 0;
 	while (sleep_interval < s) {
@@ -89,7 +89,7 @@ void sleep(uint8_t s, uint8_t mode) {
 	cli();
 }
 
-void adcEnable() {
+static void adcEnable() {
 	PRR &= ~(1<<PRADC);
 	ADMUX =
 		(0 << REFS0) |             // VCC as voltage reference
@@ -104,19 +104,19 @@ void adcEnable() {
 		(1 << ADPS0);              // set prescaler to 64, bit 0
 }
 
-void adcDisable() {
+static void adcDisable() {
 	ADCSRA &= ~(1<<ADEN);          // remove ADC enable
 	PRR |= (1<<PRADC);
 }
 
-uint16_t readADC() {
+static uint16_t readADC() {
 	ADCSRA |= (1 << ADSC);         // start ADC measurement.
 	while (ADCSRA & (1 << ADSC) ); // wait till conversion completes
 
 	return ADCW;
 }
 
-uint16_t readLightLevel() {
+static uint16_t readLightLevel() {
 	uint16_t lightLevel;
 
 	adcEnable();
@@ -193,15 +193,14 @@ int main() {
 						firefly1(pgm_read_byte(&sequence[i+offset1])>>intensity_shift1);
 					sleep(1, SLEEP_MODE_IDLE);
 				}
+				// Recover WDT after changing WDT to smaller value
+				setupWDT(WDP_8S);
 
 				// Disable PWM channels
 				TCCR0A &= ~(1 << COM0B1);
 				TCCR0A &= ~(1 << COM0A1);
 				// Recover PB4 for ADC read
 				DDRB &= ~(1<<PB4);
-
-				// Recover WDT after changing WDT to smaller value
-				setupWDT(WDP_8S);
 			}
 		} else {
 			if(firefly_tokens < TOKENS_MAX) {
