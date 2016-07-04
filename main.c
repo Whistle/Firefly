@@ -54,7 +54,6 @@ void setupPWM() {
 	// Set to 'Fast PWM' mode
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
 	// Clear OC0A (PB0) output on compare match, upwards counting.
-	TCCR0A |= (1 << COM0A1);
 	// Set duty cycle to 0
 	OCR0B = 0;
 	OCR0A = 0;
@@ -165,20 +164,25 @@ int main() {
 			if(firefly_tokens > 0) {
 				firefly_tokens--;
 
+				// Pull PB4 to GND for PWM
 				DDRB |= (1<<PB4);
+				// Enable PWM channel
 				TCCR0A |= (1 << COM0B1);
+				TCCR0A |= (1 << COM0A1);
 
 				offset0 = 0;
 				offset1 = 0;
+				intensity_shift0 = 0;
+				intensity_shift1 = 0;
 				if(pattern & FIREFLY0_OFFSET)
 					offset0 = 2;
 				if(pattern & FIREFLY1_OFFSET)
 					offset1 = 2;
 
 				if(pattern & FIREFLY0_INTENSITY)
-					intensity_shift0 = 2;
+					intensity_shift0 = 1;
 				if(pattern & FIREFLY1_INTENSITY)
-					intensity_shift1 = 2;
+					intensity_shift1 = 1;
 
 				// firefly sequence
 				setupWDT(WDP_32MS);
@@ -189,7 +193,11 @@ int main() {
 						firefly1(pgm_read_byte(&sequence[i+offset1])>>intensity_shift1);
 					sleep(1, SLEEP_MODE_IDLE);
 				}
+
+				// Disable PWM channels
 				TCCR0A &= ~(1 << COM0B1);
+				TCCR0A &= ~(1 << COM0A1);
+				// Recover PB4 for ADC read
 				DDRB &= ~(1<<PB4);
 
 				// Recover WDT after changing WDT to smaller value
