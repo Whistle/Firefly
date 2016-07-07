@@ -1,3 +1,15 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <avr/wdt.h>
+#include <avr/sleep.h>
+#include <avr/pgmspace.h>
+
+// Watchdog timings
+#define WDP_32MS  (1<<WDP0)
+#define WDP_125MS ((1<<WDP1) | (1<<WDP0))
+#define WDP_8S    ((1<<WDP3) | (1<<WDP0))
+
+// Lightlevel boundaries
 #define UPPER_LIMIT 10
 #define CONFIDENCE_LIMIT 7
 #define LOWER_LIMIT 0
@@ -5,6 +17,7 @@
 // 900 * 8s = 7200s = 2h
 #define TOKENS_MAX 900
 
+// Firefly pattern bit selections
 #define FIREFLY0_ENABLED (1<<0)
 #define FIREFLY1_ENABLED (1<<1)
 
@@ -14,17 +27,9 @@
 #define FIREFLY0_INTENSITY (1<<4)
 #define FIREFLY1_INTENSITY (1<<5)
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
-#include <avr/wdt.h>
-#include <avr/sleep.h>
-#include <avr/pgmspace.h>
-
-#define WDP_32MS  (1<<WDP0)
-#define WDP_125MS ((1<<WDP1) | (1<<WDP0))
-#define WDP_8S    ((1<<WDP3) | (1<<WDP0))
-
-#define SEQ_SIZE 22
+// Firefly sequence length
+#define SEQ_SIZE   22
+#define SEQ_OFFSET 2
 
 volatile uint8_t sleep_interval;
 
@@ -196,9 +201,9 @@ int main() {
 				offset0 = 0;
 				offset1 = 0;
 				if(pattern & FIREFLY0_OFFSET)
-					offset0 = 2;
+					offset0 = SEQ_OFFSET;
 				if(pattern & FIREFLY1_OFFSET)
-					offset1 = 2;
+					offset1 = SEQ_OFFSET;
 
 				intensity_shift0 = 0;
 				intensity_shift1 = 0;
@@ -210,7 +215,7 @@ int main() {
 
 				// firefly sequence
 				setupWDT(WDP_32MS);
-				for(i=0; i < (SEQ_SIZE - 2); i++) {
+				for(i=0; i < (SEQ_SIZE - SEQ_OFFSET); i++) {
 					if(pattern & FIREFLY0_ENABLED)
 						firefly0(pgm_read_byte(&sequence[i+offset0])>>intensity_shift0);
 					if(pattern & FIREFLY1_ENABLED)
