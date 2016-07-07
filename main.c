@@ -2,6 +2,7 @@
 #define CONFIDENCE_LIMIT 7
 #define LOWER_LIMIT 0
 
+// 900 * 8s = 7200s = 2h
 #define TOKENS_MAX 900
 
 #define FIREFLY0_ENABLED (1<<0)
@@ -149,7 +150,7 @@ int main() {
 	for(i = 0; i < 4; i++) {
 		light_threshold += readLightLevel();
 	}
-	light_threshold >>= 2;
+	light_threshold /= 4;
 
 	// Indication of completed setup
 	setupWDT(WDP_125MS);
