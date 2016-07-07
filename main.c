@@ -1,5 +1,3 @@
-#define LIGTH_THRESHOLD   0xBF
-
 #define UPPER_LIMIT 10
 #define CONFIDENCE_LIMIT 7
 #define LOWER_LIMIT 0
@@ -21,10 +19,9 @@
 #include <avr/sleep.h>
 #include <avr/pgmspace.h>
 
-#define WDP_32MS (1<<WDP0)
-#define WDP_1S  ((1<<WDP2) | (1<<WDP1))
-#define WDP_2S  ((1<<WDP2) | (1<<WDP1) | (1<<WDP0))
-#define WDP_8S  ((1<<WDP3) | (1<<WDP0))
+#define WDP_32MS  (1<<WDP0)
+#define WDP_125MS ((1<<WDP1) | (1<<WDP0))
+#define WDP_8S    ((1<<WDP3) | (1<<WDP0))
 
 #define SEQ_SIZE 22
 
@@ -32,6 +29,7 @@ volatile uint8_t sleep_interval;
 
 int8_t darkness;
 int16_t firefly_tokens;
+uint16_t light_threshold;
 
 // Duty cycle sequence of the firefly
 uint8_t const sequence[SEQ_SIZE] PROGMEM = {
@@ -51,7 +49,6 @@ static void setupPWM() {
 	TCCR0B |= (1 << CS00);
 	// Set to 'Fast PWM' mode
 	TCCR0A |= (1 << WGM01) | (1 << WGM00);
-	// Clear OC0A (PB0) output on compare match, upwards counting.
 	// Set duty cycle to 0
 	OCR0B = 0;
 	OCR0A = 0;
@@ -115,23 +112,25 @@ static uint16_t readADC() {
 }
 
 static uint16_t readLightLevel() {
-	uint16_t lightLevel;
+	uint16_t result;
 
 	adcEnable();
 	readADC();                     // dummy read
-	lightLevel = readADC();        // reading ADC
+	result = readADC();            // reading ADC
 
 	adcDisable();
-	return lightLevel;
+	return result;
 }
 
 int main() {
 	uint8_t i;
-	uint16_t lightLevel;
+
+	uint16_t light_level;
 	uint16_t pattern;
 
 	uint8_t offset0, intensity_shift0;
 	uint8_t offset1, intensity_shift1;
+
 
 	// We will never use the AC
 	ACSR |= (1<<ACD);
@@ -146,20 +145,40 @@ int main() {
 	setupPWM();
 	setupWDT(WDP_8S);
 
+	// Set current light level as threshold
+	for(i = 0; i < 4; i++) {
+		light_threshold += readLightLevel();
+	}
+	light_threshold >>= 2;
+
+	// Indication of completed setup
+	setupWDT(WDP_125MS);
+	firefly1(255);
+	sleep(1, SLEEP_MODE_IDLE);
+	firefly1(0);
+	sleep(1, SLEEP_MODE_IDLE);
+	firefly1(255);
+	sleep(1, SLEEP_MODE_IDLE);
+	firefly1(0);
+	setupWDT(WDP_8S);
+
+	// Setting start values
 	darkness = LOWER_LIMIT;
 	firefly_tokens = TOKENS_MAX;
 
 	while(1) {
-		lightLevel = readLightLevel();
+		light_level = readLightLevel();
 
-		if(lightLevel > LIGTH_THRESHOLD) {
+		if(light_level > light_threshold) {
 			if(darkness < UPPER_LIMIT) darkness++;
 		} else {
 			if(darkness > LOWER_LIMIT) darkness--;
 		}
 
 		if(darkness >= CONFIDENCE_LIMIT) {
-			pattern = random() ^ lightLevel;
+			// Get a pattern with some entropy from the current lightlevel
+			pattern = random() ^ light_level;
+
 			if(firefly_tokens > 0) {
 				firefly_tokens--;
 
@@ -168,22 +187,25 @@ int main() {
 
 				PRR &= ~(1<<PRTIM0);
 				// Enable PWM channel
-				TCCR0A |= (1 << COM0B1);
-				TCCR0A |= (1 << COM0A1);
+				if(pattern & FIREFLY0_ENABLED)
+					TCCR0A |= (1 << COM0B1);
+				if(pattern & FIREFLY1_ENABLED)
+					TCCR0A |= (1 << COM0A1);
 
 				offset0 = 0;
 				offset1 = 0;
-				intensity_shift0 = 0;
-				intensity_shift1 = 0;
 				if(pattern & FIREFLY0_OFFSET)
 					offset0 = 2;
 				if(pattern & FIREFLY1_OFFSET)
 					offset1 = 2;
 
+				intensity_shift0 = 0;
+				intensity_shift1 = 0;
 				if(pattern & FIREFLY0_INTENSITY)
 					intensity_shift0 = 1;
 				if(pattern & FIREFLY1_INTENSITY)
 					intensity_shift1 = 1;
+
 
 				// firefly sequence
 				setupWDT(WDP_32MS);
