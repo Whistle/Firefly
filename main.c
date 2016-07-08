@@ -153,25 +153,16 @@ int main() {
 	setupWDT(WDP_8S);
 
 	// Set current light level as threshold
+	light_threshold = 0;
 	for(i = 0; i < 4; i++) {
 		light_threshold += readLightLevel();
 	}
 	light_threshold /= 4;
 
-	// Indication of completed setup
-	setupWDT(WDP_125MS);
-	firefly1(255);
-	sleep(1, SLEEP_MODE_IDLE);
-	firefly1(0);
-	sleep(1, SLEEP_MODE_IDLE);
-	firefly1(255);
-	sleep(1, SLEEP_MODE_IDLE);
-	firefly1(0);
-	setupWDT(WDP_8S);
-
 	// Setting start values
 	darkness = LOWER_LIMIT;
 	firefly_tokens = TOKENS_MAX;
+	pattern = FIREFLY0_ENABLED;
 
 	while(1) {
 		light_level = readLightLevel();

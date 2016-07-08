@@ -9,7 +9,7 @@ main: $(OBJS)
 	${CC} -Os -mmcu=${MCU} -o $@ $^
 	avr-size --mcu=${MCU} $@
 %.o: %.c
-	${CC} -c -Os -mmcu=${MCU} -o $@ $^
+	${CC} -Wall -c -Os -mmcu=${MCU} -o $@ $^
 burn: main.hex
 	avrdude -p${MCU_AVRDUDE} -cavrispmkII -P /dev/ttyUSB0 -U flash:w:$<
 # internal 128kHz without DIV8
