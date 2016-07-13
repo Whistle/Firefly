@@ -145,7 +145,7 @@ int main() {
 	DIDR0 = (1<<ADC0D) | (1<<ADC2D) | (1<<ADC3D) | (1<<ADC1D) | (1<<AIN1D) | (1<<AIN0D);
 
 	// Setup OC0B (PB1) and OC0A (PB0) as output
-	DDRB = (1<<PB1) | (1<<PB0);
+	DDRB = (1<<DDB1) | (1<<DDB0);
 	PORTB |= (1<<PB2) | (1<<PB3)| (1<<PB5);
 
 	// Setup PWM channels and Watchdog
@@ -181,7 +181,7 @@ int main() {
 				firefly_tokens--;
 
 				// Pull PB4 to GND for PWM
-				DDRB |= (1<<PB4);
+				DDRB |= (1<<DDB4);
 
 				PRR &= ~(1<<PRTIM0);
 				// Enable PWM channel
@@ -222,7 +222,7 @@ int main() {
 				TCCR0A &= ~(1 << COM0A1);
 				PRR |= (1<<PRTIM0);
 				// Recover PB4 for ADC read
-				DDRB &= ~(1<<PB4);
+				DDRB &= ~(1<<DDB4);
 			}
 		} else {
 			if(firefly_tokens < TOKENS_MAX) {
