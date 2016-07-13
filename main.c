@@ -180,7 +180,7 @@ int main() {
 			if(firefly_tokens > 0) {
 				firefly_tokens--;
 
-				// Pull PB4 to GND for PWM
+				// Tie PB4 to VCC for PWM
 				DDRB |= (1<<DDB4);
 
 				PRR &= ~(1<<PRTIM0);
